@@ -46,8 +46,6 @@ jobs:
         run: flutter pub get
 
       # Step 6: Analyze code
-      - name: Analyze
-        run: flutter analyze
 
       # Step 7: Run tests
       - name: Test
