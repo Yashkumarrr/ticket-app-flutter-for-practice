@@ -1,28 +1,22 @@
 name: Flutter CI (S3 Config + APK Artifact)
 
-# Trigger CI on push to main or on PRs
 on:
+  pull_request:
   push:
     branches: [ "main" ]
-  pull_request:
-
-# Required for OIDC
-permissions:
-  id-token: write
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
-      AWS_REGION: us-east-1          # Change if your bucket is in a different region
-      S3_BUCKET: pawspal-flutter-apk       # Replace with your S3 bucket
+      AWS_REGION: us-east-1
+      S3_BUCKET: pawspal-flutter-apk 
       APP_ENV: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
 
     steps:
       # Step 1: Checkout code
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       # Step 2: Setup Flutter
@@ -32,25 +26,26 @@ jobs:
           flutter-version: "3.22.0"
           cache: true
 
-      # Step 3: Configure AWS credentials using OIDC (MRN / ARN)
-      - name: Configure AWS credentials (OIDC)
+      # Step 3: Configure AWS credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       # Step 4: Fetch config from S3
-      - name: Fetch config from S3
+      - name: Fetch config from S3 into ./config
         run: |
           mkdir -p config
           aws s3 cp "s3://${S3_BUCKET}/config/${APP_ENV}/app_config.json" "config/app_config.json"
           test -s config/app_config.json
 
-      # Step 5: Install Flutter dependencies
+      # Step 5: Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # Step 6: Run code analysis
+      # Step 6: Analyze code
       - name: Analyze
         run: flutter analyze
 
@@ -58,14 +53,13 @@ jobs:
       - name: Test
         run: flutter test
 
-      # Step 8: Build APK (Release)
+      # Step 8: Build APK
       - name: Build APK (Release)
         run: flutter build apk --release
 
       # Step 9: Upload APK to S3
-      - name: Upload APK to S3
+      - name: Upload APK to S3 artifacts folder
         run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           SHORT_SHA="${GITHUB_SHA::7}"
-          aws s3 cp \
-            build/app/outputs/flutter-apk/app-release.apk \
-            s3://${S3_BUCKET}/artifacts/${APP_ENV}/app-release-${SHORT_SHA}.apk
+          aws s3 cp "${APK_PATH}" "s3://${S3_BUCKET}/artifacts/${APP_ENV}/app-release-${SHORT_SHA}.apk"
