@@ -1,0 +1,44 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.0"
+          cache: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Fetch config
+        run: |
+          mkdir -p config
+          aws s3 cp s3://your-bucket/config/dev/app_config.json config/app_config.json
+          test -s config/app_config.json
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --release
+
+      - name: Upload APK
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          aws s3 cp build/app/outputs/flutter-apk/app-release.apk \
+            s3://your-bucket/artifacts/dev/app-release-${SHORT_SHA}.apk
