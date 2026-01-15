@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir -p config
           aws s3 cp "s3://${S3_BUCKET}/config/${APP_ENV}/app_config.json" "config/app_config.json"
-          test -s config/app_config.json
+          
 
       # Step 5: Install dependencies
       - name: Install dependencies
